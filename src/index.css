@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-bank-primary: rgb(2, 62, 138);
+  --color-bank-secondary: rgb(0, 45, 100);
+  --color-bank-accent: rgb(0, 119, 182);
+  --color-bank-soft: rgb(240, 247, 255);
+}
+
+body {
+  @apply bg-[#f8fafc] text-slate-800 font-sans antialiased;
+}
+
+.atm-screen {
+  @apply bg-white text-slate-800 overflow-hidden shadow-[0_32px_64px_-12px_rgba(0,0,0,0.08)] border border-slate-100;
+}
+
+.atm-button {
+  @apply flex items-center justify-between px-8 py-5 rounded-2xl transition-all active:scale-[0.98] text-lg font-semibold border-2 border-transparent;
+}
+
+.atm-button-primary {
+  @apply bg-bank-primary hover:bg-bank-secondary text-white shadow-md hover:shadow-lg;
+}
+
+.atm-button-secondary {
+  @apply bg-bank-soft hover:bg-slate-200 text-bank-primary;
+}
+
+.atm-button-danger {
+  @apply bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-100;
+}
+
+.atm-button-success {
+  @apply bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100;
+}
+
+@keyframes soft-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+.animate-soft-pulse {
+  animation: soft-pulse 2s infinite ease-in-out;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 4s infinite ease-in-out;
+}

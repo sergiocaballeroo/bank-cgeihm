@@ -1,0 +1,5 @@
+{
+  "name": "Cajero Automático Pro",
+  "description": "Interfaz profesional de cajero automático con flujos de retiro, consulta y depósito.",
+  "requestFramePermissions": []
+}
