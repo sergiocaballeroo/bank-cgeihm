@@ -42,14 +42,32 @@ export default function App() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [showInsufficientFunds, setShowInsufficientFunds] = useState(false);
 
-  // Automatic redirect to welcome screen after 10 seconds on any result screen (increased time)
+  // Inactivity timeout: 1 minute (60,000 ms)
   useEffect(() => {
-    if (state.currentScreen.endsWith('_RESULT')) {
-      const timer = setTimeout(() => {
+    if (state.currentScreen === 'WELCOME') return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
         resetTransaction();
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
+      }, 60000); // 1 minute
+    };
+
+    // Initial timer
+    resetTimer();
+
+    // Event listeners for activity
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    const handleActivity = () => resetTimer();
+
+    events.forEach(event => document.addEventListener(event, handleActivity));
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => document.removeEventListener(event, handleActivity));
+    };
   }, [state.currentScreen]);
 
   const navigateTo = (screen: Screen) => {
@@ -62,20 +80,22 @@ export default function App() {
   };
 
   const resetTransaction = () => {
-    setState({
+    setState(prev => ({
       currentScreen: 'WELCOME',
       amount: 0,
       destinationAccount: '',
       reference: '',
-      balance: state.balance, // Keep the simulated balance
+      balance: prev.balance, // Keep the simulated balance
       error: null,
       isSuccess: false,
-    });
+    }));
     setCardlessData({
       withdrawalNumber: '',
       securityKey: '',
     });
     setIsPrinting(false);
+    setShowReceipt(false);
+    setShowInsufficientFunds(false);
   };
 
   const goToMainMenu = () => {
@@ -101,14 +121,15 @@ export default function App() {
     setIsPrinting(false);
     setShowReceipt(true);
     
-    // After showing receipt for 10 seconds, reset to welcome
-    setTimeout(() => {
-      setShowReceipt(false);
-      resetTransaction();
-    }, 10000);
+    // After showing receipt, user must close it manually
+    // setTimeout removed
   };
 
   const handleWithdraw = (amount: number) => {
+    if (amount <= 0) {
+      setState(prev => ({ ...prev, error: 'Ingrese un monto mayor a $0' }));
+      return;
+    }
     if (amount > state.balance) {
       setShowInsufficientFunds(true);
       return;
@@ -160,13 +181,29 @@ export default function App() {
     }));
   };
 
+  const handleDepositNext = () => {
+    if (state.destinationAccount.length < 10 || state.destinationAccount.length > 18) {
+      setState(prev => ({ ...prev, error: 'Cuenta destino no válida (10-18 dígitos)' }));
+      return;
+    }
+    if (state.amount <= 0) {
+      setState(prev => ({ ...prev, error: 'Monto inválido, ingresa un monto mayor a 0' }));
+      return;
+    }
+    if (state.amount > state.balance) {
+      setShowInsufficientFunds(true);
+      return;
+    }
+    navigateTo('DEPOSIT_CONFIRM');
+  };
+
   const confirmDeposit = async () => {
     if (state.destinationAccount.length < 10 || state.destinationAccount.length > 18) {
       setState(prev => ({ ...prev, error: 'Cuenta destino no válida (10-18 dígitos)' }));
       return;
     }
-    if (state.amount <= 0 || state.amount % 100 !== 0) {
-      setState(prev => ({ ...prev, error: 'Monto inválido, ingresa un múltiplo de 100' }));
+    if (state.amount <= 0) {
+      setState(prev => ({ ...prev, error: 'Monto inválido, ingresa un monto mayor a 0' }));
       return;
     }
 
@@ -302,13 +339,6 @@ export default function App() {
         )}
         <h1 className="text-3xl font-bold text-slate-800 tracking-tight">{title}</h1>
       </div>
-      <button 
-        onClick={() => navigateTo('CANCEL_CONFIRM')}
-        className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all font-semibold"
-      >
-        <X size={20} />
-        <span>Cancelar</span>
-      </button>
     </div>
   );
 
@@ -374,6 +404,16 @@ export default function App() {
         <div className="absolute top-8 left-12 z-20">
           <BankLogo />
         </div>
+
+        {state.currentScreen !== 'WELCOME' && state.currentScreen !== 'CANCEL_CONFIRM' && (
+          <button 
+            onClick={() => navigateTo('CANCEL_CONFIRM')}
+            className="absolute top-8 right-12 z-20 p-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-100 transition-all font-bold flex items-center gap-2 shadow-sm border border-rose-100"
+          >
+            <X size={24} />
+            <span className="hidden md:inline">Cancelar</span>
+          </button>
+        )}
 
         <AnimatePresence>
           {processing && <LoadingOverlay />}
@@ -732,9 +772,13 @@ export default function App() {
                     type="number"
                     autoFocus
                     step="100"
+                    min="0"
                     className="w-full bg-slate-50 border-2 border-slate-100 rounded-[32px] py-10 pl-20 pr-8 text-6xl font-bold focus:border-bank-primary focus:bg-white outline-none transition-all text-slate-800"
                     placeholder="0"
-                    onChange={(e) => setState(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setState(prev => ({ ...prev, amount: val < 0 ? 0 : val }));
+                    }}
                   />
                 </div>
                 <p className="mt-6 text-slate-400 text-center text-lg font-medium">Ingrese múltiplos de $100 para continuar</p>
@@ -905,10 +949,13 @@ export default function App() {
                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl text-slate-300">$</span>
                       <input 
                         type="number"
-                        step="100"
+                        min="0"
                         className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-6 pl-14 px-8 text-3xl font-bold focus:border-bank-primary focus:bg-white outline-none transition-all"
                         placeholder="0"
-                        onChange={(e) => setState(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setState(prev => ({ ...prev, amount: val < 0 ? 0 : val }));
+                        }}
                       />
                     </div>
                   </div>
@@ -935,7 +982,7 @@ export default function App() {
                 )}
 
                 <button 
-                  onClick={() => navigateTo('DEPOSIT_CONFIRM')}
+                  onClick={handleDepositNext}
                   className="atm-button atm-button-primary w-full mt-6 justify-center py-8 text-3xl rounded-[32px] shadow-xl shadow-bank-primary/20"
                 >
                   Continuar con el Depósito
@@ -980,6 +1027,17 @@ export default function App() {
                   )}
                 </div>
               </div>
+
+              {state.error && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-8 p-5 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-4 text-rose-600 w-full max-w-xl"
+                >
+                  <AlertCircle size={24} />
+                  <span className="font-bold text-lg">{state.error}</span>
+                </motion.div>
+              )}
               
               <div className="flex gap-8 w-full max-w-xl">
                 <button 
